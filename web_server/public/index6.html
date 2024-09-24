@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Video Stream</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+            color: #333;
+            text-align: center;
+            margin: 0;
+            padding: 20px;
+            position: relative; /* For positioning overlay */
+        }
+        h2 {
+            margin-bottom: 20px;
+        }
+        canvas {
+            background-color: black;
+            display: block;
+            margin: 0 auto;
+            border: 2px solid #ccc;
+            border-radius: 5px;
+        }
+        /* Overlay Styles */
+        #overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%); /* Center the overlay */
+            background: rgba(255, 255, 255, 0.9);
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+            z-index: 10; /* On top of the canvas */
+        }
+        #overlay input {
+            padding: 5px;
+            margin: 5px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+            width: 120px; /* Set width for input fields */
+        }
+        #overlay button {
+            padding: 5px 10px;
+            border-radius: 5px;
+            border: none;
+            cursor: pointer;
+            background-color: #007bff;
+            color: white;
+            transition: background-color 0.3s;
+        }
+        #overlay button:hover {
+            background-color: #0056b3;
+        }
+        /* Control Buttons */
+        #controls {
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h2>Live Video Stream</h2>
+    <div id="canvasContainer">
+        <canvas id="videoCanvas" width="640" height="480"></canvas>
+        <div id="overlay">
+            <h3>Connect to Server</h3>
+            <input type="text" id="serverIP" placeholder="Server IP" />
+            <input type="number" id="serverPort" placeholder="Port" />
+            <button id="connectBtn">Connect</button>
+        </div>
+    </div>
+
+    <div id="controls" style="display:none;">
+        <button id="fullscreenBtn">Fullscreen</button>
+        <button id="pauseBtn">Pause</button>
+        <button id="aspectRatioBtn">16:9</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('videoCanvas');
+        const context = canvas.getContext('2d');
+        let socket;
+        let isPaused = false;
+        let totalFrames = 0;
+        let currentFrame = 0;
+        let is16by9Mode = false;
+
+        document.getElementById('connectBtn').onclick = function() {
+            const ip = document.getElementById('serverIP').value;
+            const port = document.getElementById('serverPort').value;
+
+            if (validateIP(ip) && validatePort(port)) {
+                socket = new WebSocket(`ws://${ip}:${port}`);
+
+                socket.binaryType = 'blob';
+
+                socket.onopen = function() {
+                    console.log('WebSocket connection opened');
+                    document.getElementById('overlay').style.display = 'none'; // Hide the overlay
+                    document.getElementById('controls').style.display = 'block'; // Show controls
+                };
+
+                socket.onmessage = function(event) {
+                    if (!isPaused) {
+                        const img = new Image();
+                        img.src = URL.createObjectURL(event.data);
+
+                        img.onload = function() {
+                            context.clearRect(0, 0, canvas.width, canvas.height);
+                            if (is16by9Mode) {
+                                drawImageFit16by9(img);
+                            } else {
+                                context.drawImage(img, 0, 0, canvas.width, canvas.height);
+                            }
+
+                            URL.revokeObjectURL(img.src);
+                            totalFrames++;
+                            currentFrame++;
+                            updateProgress();
+                        };
+
+                        img.onerror = function() {
+                            console.error('Error loading image');
+                        };
+                    }
+                };
+
+                socket.onerror = function(error) {
+                    console.error('WebSocket Error:', error);
+                };
+
+                socket.onclose = function(event) {
+                    console.log('WebSocket connection closed:', event);
+                };
+            } else {
+                alert('Invalid IP address or port number. Please enter valid values.');
+            }
+        };
+
+        document.getElementById('fullscreenBtn').onclick = function() {
+            if (canvas.requestFullscreen) {
+                canvas.requestFullscreen();
+            } else if (canvas.mozRequestFullScreen) { // Firefox
+                canvas.mozRequestFullScreen();
+            } else if (canvas.webkitRequestFullscreen) { // Chrome, Safari and Opera
+                canvas.webkitRequestFullscreen();
+            } else if (canvas.msRequestFullscreen) { // IE/Edge
+                canvas.msRequestFullscreen();
+            }
+        };
+
+        document.getElementById('pauseBtn').onclick = function() {
+            isPaused = !isPaused;
+            this.textContent = isPaused ? 'Resume' : 'Pause';
+        };
+
+        document.getElementById('aspectRatioBtn').onclick = function() {
+            is16by9Mode = !is16by9Mode;
+            this.textContent = is16by9Mode ? 'Normal' : '16:9'; // Toggle button text
+        };
+
+        function validateIP(ip) {
+            const ipRegex = /^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
+            return ipRegex.test(ip); // Validate IPv4
+        }
+
+        function validatePort(port) {
+            return port > 0 && port < 65536; // Validate port number range
+        }
+
+        function drawImageFit16by9(img) {
+            const canvasAspect = 16 / 9;
+            const imgAspect = img.width / img.height;
+            let drawWidth, drawHeight;
+
+            if (canvasAspect > imgAspect) {
+                drawWidth = canvas.height * canvasAspect;
+                drawHeight = canvas.height;
+            } else {
+                drawHeight = canvas.width / canvasAspect;
+                drawWidth = canvas.width;
+            }
+
+            const x = (canvas.width - drawWidth) / 2;
+            const y = (canvas.height - drawHeight) / 2;
+
+            context.drawImage(img, x, y, drawWidth, drawHeight);
+        }
+
+        function updateProgress() {
+            const progress = document.getElementById('progress');
+            const percentage = (currentFrame / totalFrames) * 100;
+            progress.style.width = percentage + '%';
+        }
+    </script>
+</body>
+</html>
+
