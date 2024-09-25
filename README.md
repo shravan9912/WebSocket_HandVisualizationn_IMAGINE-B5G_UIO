@@ -3,17 +3,20 @@
 ## Install Pre-Requesties
 ### Server side
       sudo apt update
-
+Next
       
       sudo apt install python3-opencv
 
+Next
 
       pip install websockets
 
-      
-      npm install express
+Next   
 
+      npm install express
       
+Next     
+
       sudo apt install ffmpeg
       
 ### Client Side
