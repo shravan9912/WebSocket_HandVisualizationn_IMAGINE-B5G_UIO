@@ -23,6 +23,13 @@ Next
     Latest browsers like Chrome, Firefox, Safari
 
 ## To Run the setup
+## Simple
+Opem Terminal
+Go to the Project Hime DIR
+
+      bash run.sh
+      
+## Detailed
 ### Server side:
 Open terminal
 Go to Project Home DIR
